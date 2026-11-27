@@ -3,9 +3,11 @@
 
 import { useMemo, useState } from "react";
 import StatCard from "@/components/ui/statcard";
+import DataTable from "@/components/ui/datatable";
+import SearchBar from "@/components/ui/searchbar";
+import StatusBadge from "@/components/ui/statusbadge";
 
 import {
-  Search,
   Plus,
   X,
   ClipboardList,
@@ -80,21 +82,6 @@ const initialRequests = [
   },
 ];
 
-// Styles
-const statusStyles = {
-  Pending: "bg-amber-50 text-amber-700 border-amber-200",
-  Approved: "bg-blue-50 text-blue-700 border-blue-200",
-  Issued: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  Rejected: "bg-red-50 text-red-700 border-red-200",
-};
-
-const priorityStyles = {
-  Emergency: "bg-red-50 text-red-700",
-  High: "bg-orange-50 text-orange-700",
-  Normal: "bg-slate-100 text-slate-600",
-};
-
-// Empty form
 const emptyForm = {
   patient: "",
   hospital: "",
@@ -106,11 +93,9 @@ const emptyForm = {
   contact: "",
 };
 
-// Reusable input styling
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100";
 
-// Repeated form fields
 const formFields = [
   {
     label: "Patient Name",
@@ -174,9 +159,10 @@ export default function RequestsPage() {
     (r) => r.status === "Approved"
   ).length;
 
-  const issuedCount = requests.filter(
-    (r) => r.status === "Issued"
-  ).length;
+  // Count actual units issued, not issued requests
+  const issuedUnits = requests
+    .filter((r) => r.status === "Issued")
+    .reduce((total, r) => total + r.units, 0);
 
   const stats = [
     {
@@ -205,7 +191,7 @@ export default function RequestsPage() {
     },
     {
       title: "Units Issued",
-      value: issuedCount,
+      value: issuedUnits,
       change: `${approvedCount} requests approved`,
       icon: CheckCircle2,
       color: "text-emerald-600",
@@ -243,6 +229,12 @@ export default function RequestsPage() {
     }));
   }
 
+  // Close modal and reset form
+  function closeModal() {
+    setShowModal(false);
+    setForm(emptyForm);
+  }
+
   // Add new request
   function addRequest(event) {
     event.preventDefault();
@@ -255,8 +247,7 @@ export default function RequestsPage() {
     };
 
     setRequests((previous) => [newRequest, ...previous]);
-    setForm(emptyForm);
-    setShowModal(false);
+    closeModal();
   }
 
   // Update request status
@@ -349,19 +340,13 @@ export default function RequestsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
-              <div className="relative">
-                <Search
-                  size={17}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search requests..."
-                  className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100 sm:w-56"
-                />
-              </div>
+              <SearchBar
+                value={search}
+                onChange={setSearch}
+                placeholder="Search requests..."
+                className="sm:w-56 sm:flex-none"
+                inputClassName="rounded-xl focus:border-rose-400 focus:ring-rose-100"
+              />
 
               <select
                 value={statusFilter}
@@ -389,146 +374,124 @@ export default function RequestsPage() {
           </div>
 
           {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1050px] text-left">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-5 py-4 font-semibold">Request ID</th>
-                  <th className="px-5 py-4 font-semibold">Patient / Hospital</th>
-                  <th className="px-5 py-4 font-semibold">Blood Required</th>
-                  <th className="px-5 py-4 font-semibold">Units</th>
-                  <th className="px-5 py-4 font-semibold">Request Date</th>
-                  <th className="px-5 py-4 font-semibold">Priority</th>
-                  <th className="px-5 py-4 font-semibold">Status</th>
-                  <th className="px-5 py-4 font-semibold">Action</th>
-                </tr>
-              </thead>
+          <DataTable
+            columns={[
+              "Request ID",
+              "Patient / Hospital",
+              "Blood Required",
+              "Units",
+              "Request Date",
+              "Priority",
+              "Status",
+              "Action",
+            ]}
+            data={filteredRequests}
+            minWidth="1050px"
+            emptyMessage={
+              <div className="py-4 text-center">
+                <ClipboardList
+                  size={32}
+                  className="mx-auto text-slate-300"
+                />
 
-              <tbody className="divide-y divide-slate-100">
-                {filteredRequests.map((request) => (
-                  <tr
-                    key={request.id}
-                    className="transition hover:bg-slate-50"
-                  >
-                    <td className="px-5 py-4">
-                      <span className="font-semibold text-slate-800">
-                        {request.id}
-                      </span>
-                    </td>
+                <p className="mt-3 font-semibold text-slate-700">
+                  No requests found
+                </p>
 
-                    <td className="px-5 py-4">
-                      <p className="font-semibold text-slate-800">
-                        {request.patient}
+                <p className="mt-1 text-sm text-slate-500">
+                  Try changing your search or filters.
+                </p>
+              </div>
+            }
+            renderRow={(request) => (
+              <tr
+                key={request.id}
+                className="border-b border-slate-100 transition hover:bg-slate-50"
+              >
+                <td className="px-5 py-4">
+                  <span className="font-semibold text-slate-800">
+                    {request.id}
+                  </span>
+                </td>
+
+                <td className="px-5 py-4">
+                  <p className="font-semibold text-slate-800">
+                    {request.patient}
+                  </p>
+
+                  <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                    <Building2 size={13} />
+                    {request.hospital}
+                  </p>
+                </td>
+
+                <td className="px-5 py-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+                      <Droplet size={17} />
+                    </span>
+
+                    <div>
+                      <p className="font-bold text-slate-800">
+                        {request.bloodGroup}
                       </p>
 
-                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                        <Building2 size={13} />
-                        {request.hospital}
+                      <p className="text-xs text-slate-500">
+                        {request.component}
                       </p>
-                    </td>
+                    </div>
+                  </div>
+                </td>
 
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
-                          <Droplet size={17} />
-                        </span>
+                <td className="px-5 py-4 font-semibold">
+                  {request.units} units
+                </td>
 
-                        <div>
-                          <p className="font-bold text-slate-800">
-                            {request.bloodGroup}
-                          </p>
+                <td className="px-5 py-4 text-sm text-slate-600">
+                  {request.date}
+                </td>
 
-                          <p className="text-xs text-slate-500">
-                            {request.component}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
+                <td className="px-5 py-4">
+                  <StatusBadge status={request.priority} />
+                </td>
 
-                    <td className="px-5 py-4 font-semibold">
-                      {request.units} units
-                    </td>
+                <td className="px-5 py-4">
+                  <StatusBadge status={request.status} />
+                </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-600">
-                      {request.date}
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold ${priorityStyles[request.priority]}`}
+                <td className="px-5 py-4">
+                  {request.status === "Pending" ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => updateStatus(request.id, "Approved")}
+                        className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                       >
-                        {request.priority}
-                      </span>
-                    </td>
+                        Approve
+                      </button>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${statusStyles[request.status]}`}
+                      <button
+                        onClick={() => updateStatus(request.id, "Rejected")}
+                        className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
                       >
-                        {request.status}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      {request.status === "Pending" ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateStatus(request.id, "Approved")
-                            }
-                            className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                          >
-                            Approve
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              updateStatus(request.id, "Rejected")
-                            }
-                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      ) : request.status === "Approved" ? (
-                        <button
-                          onClick={() =>
-                            updateStatus(request.id, "Issued")
-                          }
-                          className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                        >
-                          Mark Issued
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400">
-                          No action
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredRequests.length === 0 && (
-                  <tr>
-                    <td colSpan="8" className="px-5 py-12 text-center">
-                      <ClipboardList
-                        size={32}
-                        className="mx-auto text-slate-300"
-                      />
-
-                      <p className="mt-3 font-semibold text-slate-700">
-                        No requests found
-                      </p>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        Try changing your search or filters.
-                      </p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                        Reject
+                      </button>
+                    </div>
+                  ) : request.status === "Approved" ? (
+                    <button
+                      onClick={() => updateStatus(request.id, "Issued")}
+                      className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      Mark Issued
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">
+                      No action
+                    </span>
+                  )}
+                </td>
+              </tr>
+            )}
+          />
 
           <div className="border-t border-slate-100 px-5 py-4 text-sm text-slate-500">
             Showing {filteredRequests.length} of {requests.length} requests
@@ -553,7 +516,7 @@ export default function RequestsPage() {
                 </div>
 
                 <button
-                  onClick={() => setShowModal(false)}
+                  onClick={closeModal}
                   className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
                   aria-label="Close modal"
                 >
@@ -565,7 +528,6 @@ export default function RequestsPage() {
               <form onSubmit={addRequest} className="space-y-5 p-5">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-                  {/* Repeated input fields using map */}
                   {formFields.map((field) => (
                     <FormField
                       key={field.name}
@@ -573,6 +535,11 @@ export default function RequestsPage() {
                     >
                       <input
                         {...field}
+                        {...(field.name === "date"
+                          ? {
+                              min: new Date().toISOString().split("T")[0],
+                            }
+                          : {})}
                         value={form[field.name]}
                         onChange={(e) =>
                           updateForm(field.name, e.target.value)
@@ -636,7 +603,7 @@ export default function RequestsPage() {
                 <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
+                    onClick={closeModal}
                     className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
                   >
                     Cancel
