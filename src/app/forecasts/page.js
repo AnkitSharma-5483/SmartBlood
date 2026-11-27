@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -13,6 +14,8 @@ import {
 } from "lucide-react";
 
 import StatCard from "@/components/ui/statcard";
+import DataTable from "@/components/ui/datatable";
+import StatusBadge from "@/components/ui/statusbadge";
 
 // DEMO DATA - Replace with FastAPI response later
 
@@ -49,16 +52,13 @@ const forecastTable = [
 
 const components = ["RBC", "Platelets", "Plasma"];
 
-const tableHeadings = [
-  "Date",
-  "Blood Group",
-  "Predicted Demand",
-  "Confidence",
-];
-
 export default function ForecastPage() {
   const [component, setComponent] = useState("RBC");
   const [selectedGroup, setSelectedGroup] = useState("All");
+
+  // Generate forecast loading state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [lastGenerated, setLastGenerated] = useState(false);
 
   // Forecast calculations
   const totalDemand = forecastData.reduce(
@@ -76,7 +76,7 @@ export default function ForecastPage() {
     )
   );
 
-  // Filter forecast table
+  // Filter forecast table by blood group
   const filteredTable = forecastTable.filter(
     (item) =>
       selectedGroup === "All" || item.group === selectedGroup
@@ -118,10 +118,26 @@ export default function ForecastPage() {
     },
   ];
 
-  // Generate forecast
+  // Generate temporary demo forecast
   function generateForecast() {
-    alert("Connect this action to your FastAPI forecast endpoint.");
+    if (isGenerating) return;
+
+    setIsGenerating(true);
+    setLastGenerated(false);
+
+    setTimeout(() => {
+      setIsGenerating(false);
+      setLastGenerated(true);
+    }, 800);
   }
+
+  // Table headings
+  const tableHeadings = [
+    "Date",
+    "Blood Group",
+    "Predicted Demand",
+    "Confidence",
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
@@ -133,19 +149,32 @@ export default function ForecastPage() {
             <h1 className="text-2xl font-bold">
               Demand Forecasting
             </h1>
+
             <p className="mt-1 text-sm text-gray-500">
-              ML-powered blood demand prediction and analytics.
+              ML-powered blood demand prediction and analytics for {component}.
             </p>
           </div>
 
           <button
             onClick={generateForecast}
-            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700"
+            disabled={isGenerating}
+            className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
           >
-            <RefreshCw size={17} />
-            Generate Forecast
+            <RefreshCw
+              size={17}
+              className={isGenerating ? "animate-spin" : ""}
+            />
+
+            {isGenerating ? "Generating..." : "Generate Forecast"}
           </button>
         </section>
+
+        {/* Demo confirmation */}
+        {lastGenerated && (
+          <p className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            Demo forecast refreshed successfully. No live ML prediction was generated.
+          </p>
+        )}
 
         {/* Filters */}
         <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -157,7 +186,7 @@ export default function ForecastPage() {
           <select
             value={component}
             onChange={(e) => setComponent(e.target.value)}
-            className="rounded-lg border bg-white px-4 py-2 text-sm outline-none"
+            className="rounded-lg border border-slate-200 shadow-sm bg-white px-4 py-2 text-sm outline-none"
           >
             {components.map((item) => (
               <option key={item} value={item}>
@@ -190,8 +219,9 @@ export default function ForecastPage() {
               <h2 className="font-bold">
                 Actual vs Predicted Demand
               </h2>
+
               <p className="mt-1 text-sm text-gray-500">
-                Daily blood demand comparison
+                Daily {component} demand comparison
               </p>
             </div>
 
@@ -251,6 +281,7 @@ export default function ForecastPage() {
             <h2 className="font-bold">
               Blood Group-wise Forecast
             </h2>
+
             <p className="mt-1 text-sm text-gray-500">
               Predicted demand for each blood group
             </p>
@@ -260,7 +291,7 @@ export default function ForecastPage() {
             {bloodGroups.map((item) => (
               <div
                 key={item.group}
-                className="rounded-xl border p-4"
+                className="rounded-xl border p-4 border-slate-200 bg-white shadow-sm"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-lg font-bold">
@@ -311,15 +342,16 @@ export default function ForecastPage() {
               <h2 className="font-bold">
                 Detailed Forecast
               </h2>
+
               <p className="mt-1 text-sm text-gray-500">
-                Daily predicted blood requirements
+                Daily predicted {component} requirements
               </p>
             </div>
 
             <select
               value={selectedGroup}
               onChange={(e) => setSelectedGroup(e.target.value)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+              className="rounded-lg border border-slate-200 shadow-sm bg-white px-3 py-2 text-sm outline-none"
             >
               <option value="All">All Blood Groups</option>
 
@@ -331,60 +363,36 @@ export default function ForecastPage() {
             </select>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-gray-500">
-                <tr>
-                  {tableHeadings.map((heading) => (
-                    <th key={heading} className="px-5 py-4">
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+          {/* Reusable DataTable */}
+          <DataTable
+            columns={tableHeadings}
+            data={filteredTable}
+            minWidth="650px"
+            emptyMessage="No forecast records found."
+            renderRow={(item) => (
+              <tr key={item.id} className="border-t">
+                <td className="px-5 py-4">
+                  {item.date}
+                </td>
 
-              <tbody>
-                {filteredTable.map((item) => (
-                  <tr key={item.id} className="border-t">
-                    <td className="px-5 py-4">
-                      {item.date}
-                    </td>
+                <td className="px-5 py-4 font-semibold">
+                  {item.group}
+                </td>
 
-                    <td className="px-5 py-4 font-semibold">
-                      {item.group}
-                    </td>
+                <td className="px-5 py-4 font-semibold">
+                  {item.demand} Units
+                </td>
 
-                    <td className="px-5 py-4 font-semibold">
-                      {item.demand} Units
-                    </td>
+                <td className="px-5 py-4">
+                  <StatusBadge
+                    status={item.confidence}
+                    variant="confidence"
+                  />
+                </td>
+              </tr>
+            )}
+          />
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs ${
-                          item.confidence === "High"
-                            ? "bg-green-50 text-green-700"
-                            : "bg-orange-50 text-orange-700"
-                        }`}
-                      >
-                        {item.confidence}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredTable.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={tableHeadings.length}
-                      className="py-8 text-center text-gray-500"
-                    >
-                      No forecast records found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
         </section>
 
         {/* Model Information */}
