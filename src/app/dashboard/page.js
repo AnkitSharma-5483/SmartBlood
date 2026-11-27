@@ -1,12 +1,14 @@
+
 "use client";
+
+import { useState } from "react";
+import Link from "next/link";
 
 import {
   Droplet,
   TrendingUp,
   AlertTriangle,
   Clock,
-  CalendarDays,
-  Plus,
 } from "lucide-react";
 
 import StatCard from "@/components/ui/statcard";
@@ -67,17 +69,37 @@ const alerts = [
   },
 ];
 
-const demand = [
-  { day: "Mon", value: 45 },
-  { day: "Tue", value: 65 },
-  { day: "Wed", value: 55 },
-  { day: "Thu", value: 80 },
-  { day: "Fri", value: 60 },
-  { day: "Sat", value: 90 },
-  { day: "Sun", value: 70 },
-];
+// DEMO DATA
+const demandData = {
+  "7 Days": [
+    { day: "Mon", value: 45 },
+    { day: "Tue", value: 65 },
+    { day: "Wed", value: 55 },
+    { day: "Thu", value: 80 },
+    { day: "Fri", value: 60 },
+    { day: "Sat", value: 90 },
+    { day: "Sun", value: 70 },
+  ],
+
+  "30 Days": [
+    { day: "Week 1", value: 55 },
+    { day: "Week 2", value: 75 },
+    { day: "Week 3", value: 60 },
+    { day: "Week 4", value: 90 },
+  ],
+
+  "90 Days": [
+    { day: "Month 1", value: 60 },
+    { day: "Month 2", value: 80 },
+    { day: "Month 3", value: 70 },
+  ],
+};
 
 export default function DashboardPage() {
+  const [selectedPeriod, setSelectedPeriod] = useState("7 Days");
+
+  const demand = demandData[selectedPeriod];
+
   return (
     <div className="space-y-7">
 
@@ -115,7 +137,7 @@ export default function DashboardPage() {
         {/* Demand Chart */}
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
 
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-bold">
                 Blood Demand Trends
@@ -126,10 +148,20 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <CalendarDays className="text-gray-400" />
+            {/* Chart Period Filter */}
+            <select
+              value={selectedPeriod}
+              onChange={(e) => setSelectedPeriod(e.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400"
+            >
+              <option value="7 Days">7 Days</option>
+              <option value="30 Days">30 Days</option>
+              <option value="90 Days">90 Days</option>
+            </select>
           </div>
 
           <div className="flex h-56 items-end justify-around gap-3 border-b border-l px-3">
+
             {demand.map((item) => (
               <div
                 key={item.day}
@@ -140,7 +172,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div
-                  className="w-full max-w-12 rounded-t-md bg-red-500 hover:bg-red-600"
+                  className="w-full max-w-12 rounded-t-md bg-red-500 transition-all duration-300 hover:bg-red-600"
                   style={{ height: `${item.value}%` }}
                 />
 
@@ -149,12 +181,18 @@ export default function DashboardPage() {
                 </span>
               </div>
             ))}
+
           </div>
 
           <div className="mt-5 flex items-center gap-2 text-sm text-gray-500">
             <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
             Blood units demanded
           </div>
+
+          <p className="mt-3 text-xs text-gray-400">
+            Demonstration data - not actual ML predictions.
+          </p>
+
         </div>
 
       </section>
@@ -178,9 +216,10 @@ export default function DashboardPage() {
             ["Excess Stock Risk", "02 Groups", "text-orange-600"],
             ["Expiry Risk", "28 Units", "text-purple-600"],
           ].map(([title, value, color]) => (
-            <div
+            <Link
               key={title}
-              className="mb-4 flex items-center justify-between rounded-lg bg-gray-50 p-4"
+              href="/risk-analysis"
+              className="mb-4 flex items-center justify-between rounded-lg bg-gray-50 p-4 transition hover:bg-red-50"
             >
               <span className="text-sm text-gray-600">
                 {title}
@@ -189,8 +228,9 @@ export default function DashboardPage() {
               <span className={`text-sm font-bold ${color}`}>
                 {value}
               </span>
-            </div>
+            </Link>
           ))}
+
         </div>
 
         {/* Alerts */}
@@ -211,8 +251,13 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-5">
+
             {alerts.map((alert) => (
-              <div key={alert.title} className="flex gap-3">
+              <Link
+                key={alert.title}
+                href="/risk-analysis"
+                className="flex gap-3 rounded-lg p-2 transition hover:bg-slate-50"
+              >
 
                 <div
                   className={`mt-1 h-9 w-9 shrink-0 rounded-lg p-2 ${
@@ -238,9 +283,11 @@ export default function DashboardPage() {
                   </p>
                 </div>
 
-              </div>
+              </Link>
             ))}
+
           </div>
+
         </div>
 
       </section>
