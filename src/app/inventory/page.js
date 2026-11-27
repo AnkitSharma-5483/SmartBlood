@@ -6,12 +6,14 @@ import {
   Package,
   AlertTriangle,
   Clock,
-  Search,
   Plus,
   X,
 } from "lucide-react";
 
 import StatCard from "@/components/ui/statcard";
+import DataTable from "@/components/ui/datatable";
+import SearchBar from "@/components/ui/searchbar";
+import StatusBadge from "@/components/ui/statusbadge";
 
 const initialInventory = [
   { id: 1, group: "A+", component: "RBC", units: 120, expiry: "2026-12-05" },
@@ -35,7 +37,7 @@ const initialTransactions = [
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const components = ["RBC", "Platelets", "Plasma"];
-const statuses = ["All", "Healthy", "Low Stock", "Critical"];
+const statuses = ["All", "Healthy", "Low Stock", "Critical", "Expired"];
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white p-3 text-sm outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100";
@@ -47,6 +49,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [componentFilter, setComponentFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [groupFilter, setGroupFilter] = useState("All");
   const [showModal, setShowModal] = useState(false);
 
   const [today, setToday] = useState(null);
@@ -73,9 +76,14 @@ export default function InventoryPage() {
   }, []);
 
   // Calculate stock status dynamically.
-  function getStatus(units) {
-    if (units < 25) return "Critical";
-    if (units < 50) return "Low Stock";
+  function getStatus(item) {
+    if (todayString && item.expiry < todayString) {
+      return "Expired";
+    }
+
+    if (item.units < 25) return "Critical";
+    if (item.units < 50) return "Low Stock";
+
     return "Healthy";
   }
 
@@ -84,9 +92,11 @@ export default function InventoryPage() {
     0
   );
 
-  const lowStock = inventory.filter(
-    (item) => getStatus(item.units) !== "Healthy"
-  ).length;
+  const lowStock = inventory.filter((item) => {
+    const status = getStatus(item);
+
+    return status === "Low Stock" || status === "Critical";
+  }).length;
 
   const expiringSoon = today
     ? inventory.filter((item) => {
@@ -141,13 +151,22 @@ export default function InventoryPage() {
         componentFilter === "All" ||
         item.component === componentFilter;
 
+      const matchesGroup =
+        groupFilter === "All" ||
+        item.group === groupFilter;
+
       const matchesStatus =
         statusFilter === "All" ||
-        getStatus(item.units) === statusFilter;
+        getStatus(item) === statusFilter
 
-      return matchesSearch && matchesComponent && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesComponent &&
+        matchesGroup &&
+        matchesStatus
+      );
     });
-  }, [inventory, search, componentFilter, statusFilter]);
+  }, [inventory, search, componentFilter, groupFilter, statusFilter, todayString]);
 
   // Add new stock.
   function addStock(e) {
@@ -158,9 +177,16 @@ export default function InventoryPage() {
     if (
       !Number.isInteger(quantity) ||
       quantity <= 0 ||
-      !form.expiry
+      !form.expiry ||
+      !form.group ||
+      !form.component
     ) {
-      alert("Enter a valid quantity and expiry date.");
+      alert("Please enter all valid stock details.");
+      return;
+    }
+
+    if (form.expiry < todayString) {
+      alert("Expiry date cannot be in the past.");
       return;
     }
 
@@ -214,6 +240,13 @@ export default function InventoryPage() {
       units: "",
       expiry: "",
     });
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setComponentFilter("All");
+    setGroupFilter("All");
+    setStatusFilter("All");
   }
 
   // Repeated form fields.
@@ -283,21 +316,32 @@ export default function InventoryPage() {
 
           {/* Search and Filters */}
           <div className="flex flex-wrap gap-3 px-5 pb-5">
-            <div className="flex min-w-48 flex-1 items-center gap-2 rounded-lg border px-3">
-              <Search size={18} className="text-gray-400" />
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search blood group or component..."
+              className="rounded-lg"
+              inputClassName="border-slate-200"
+            />
 
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search blood group or component..."
-                className="w-full py-2.5 text-sm outline-none"
-              />
-            </div>
+            <select
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+            >
+              <option value="All">All Blood Groups</option>
+
+              {bloodGroups.map((group) => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
 
             <select
               value={componentFilter}
               onChange={(e) => setComponentFilter(e.target.value)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+              className="rounded-lg border bg-white border-slate-200 shadow-sm px-3 py-2 text-sm outline-none"
             >
               <option value="All">All Components</option>
 
@@ -311,7 +355,7 @@ export default function InventoryPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+              className="rounded-lg border bg-white border-slate-200 shadow-sm px-3 py-2 text-sm outline-none"
             >
               {statuses.map((status) => (
                 <option key={status} value={status}>
@@ -319,82 +363,60 @@ export default function InventoryPage() {
                 </option>
               ))}
             </select>
+
+            <button
+              onClick={clearFilters}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Clear Filters
+            </button>
           </div>
 
+          
           {/* Inventory Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[750px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-gray-500">
-                <tr>
-                  {[
-                    "Blood Group",
-                    "Component",
-                    "Available Units",
-                    "Expiry Date",
-                    "Stock Status",
-                  ].map((heading) => (
-                    <th key={heading} className="px-5 py-4">
-                      {heading}
-                    </th>
-                  ))}
+          <DataTable
+            columns={[
+              "Blood Group",
+              "Component",
+              "Available Units",
+              "Expiry Date",
+              "Stock Status",
+            ]}
+            data={filteredInventory}
+            minWidth="750px"
+            emptyMessage="No inventory records found."
+            renderRow={(item) => {
+              const status = getStatus(item);
+
+              return (
+                <tr
+                  key={item.id}
+                  className="border-t transition hover:bg-slate-50"
+                >
+                  <td className="px-5 py-4 font-bold">
+                    {item.group}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    {item.component}
+                  </td>
+
+                  <td className="px-5 py-4 font-semibold">
+                    {item.units}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    {item.expiry}
+                  </td>
+
+                  <td className="px-5 py-4">
+                    <StatusBadge status={status} />
+                  </td>
                 </tr>
-              </thead>
+              );
+            }}
+          />
 
-              <tbody>
-                {filteredInventory.map((item) => {
-                  const status = getStatus(item.units);
-
-                  const statusStyles = {
-                    Healthy: "bg-green-50 text-green-700",
-                    "Low Stock": "bg-orange-50 text-orange-700",
-                    Critical: "bg-red-50 text-red-700",
-                  };
-
-                  return (
-                    <tr
-                      key={item.id}
-                      className="border-t transition hover:bg-slate-50"
-                    >
-                      <td className="px-5 py-4 font-bold">
-                        {item.group}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {item.component}
-                      </td>
-
-                      <td className="px-5 py-4 font-semibold">
-                        {item.units}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {item.expiry}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[status]}`}
-                        >
-                          {status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {filteredInventory.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-10 text-center text-gray-500"
-                    >
-                      No inventory records found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
 
           <div className="border-t px-5 py-4 text-xs text-gray-500">
             Showing {filteredInventory.length} of {inventory.length} records
